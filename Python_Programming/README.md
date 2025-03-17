@@ -4,11 +4,8 @@ ___________________________________
 
 Welcome to our **Python Programming Training Repository**! This repository contains structured learning materials, projects, and exercises for Python Programming.
 
-## Courses Offered
+## Topics Covered:
 
-### 1. Python Programming
-
-- **Topics Covered:**
   - Python Basics (Variables, Data Types, Operators, Conditionals, Loops)
   - Python Data Structures
   - File Handling & Exception Handling
@@ -16,4 +13,4 @@ Welcome to our **Python Programming Training Repository**! This repository conta
   
   
 
-📂 **Path:** [python_programming](https://github.com/Publica-AI/training_materials/tree/main/Python_Programming)
+📂 **Path:** [python_programming](https://github.com/Publica-AI/data-team-course/tree/main/Python_Programming)
