@@ -1,1 +1,1 @@
-# data-team-course
+# 6 weeks Introductory AI Course
