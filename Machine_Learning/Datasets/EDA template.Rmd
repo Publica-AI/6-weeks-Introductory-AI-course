@@ -1,0 +1,842 @@
+---
+title: "EDA TEMPLATE"
+author: "iwillie"
+date: "05/01/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load libraries
+vroom: The goal of 'vroom' is to read and write data (like'csv', 'tsv' and 'fwf') quickly
+
+glue: Expressions enclosed by braces will be evaluated as R code. Long strings are broken by        line and concatenated together.
+
+scales: provides the internal scaling infrastructure used by ggplot2, and gives you tools to          override the default breaks, labels, transformations and palettes.
+
+Tidyverse: The tidyverse is an opinionated collection of R packages designed for data science:
+
+Tidytext: can make many text mining tasks easier and more effective.
+
+Lubridate: Makes easier to do the things with date-times.
+
+gghighlight: Easy way to highlight a ggplot.
+
+Janitor: For examining and cleaning dirty data.
+
+gt: Make it easier to explore data with tables.
+
+ggthemes: Collections of Beautiful themes.
+
+RColorBrewer: Contains a ready-to-use color palettes.
+
+Viridis: Contains a ready-to-use color palettes.
+
+patchwork: Arrange multiple plots together.
+
+```{r}
+#Import data
+
+bike_accidents <- vroom("./Accidents.csv")
+
+bikers <- vroom("./Bikers.csv")
+
+bike_accidents <- bike_accidents %>% clean_names()
+
+bikers <- bikers %>% clean_names()
+
+summary(bike_accidents)
+summary(bikers)
+```
+```{r}
+bike_accidents %>% filter(number_of_casualties == 60) %>% gt()
+ 
+bike_accidents %>% filter(speed_limit == 660) %>% gt()
+```
+```{r}
+bike_accidents <- bike_accidents %>% 
+  mutate(across(where(is.character), str_to_title))  %>% 
+  mutate(across(where(is.character), ~na_if(., c("Missing Data"))))
+
+bikers <- bikers %>% 
+  mutate(across(where(is.character), str_to_title))  %>% 
+  mutate(age_grp = str_replace_all(age_grp, " To ", "-"),
+         age_grp = factor(age_grp, 
+                          levels = c(
+                            "6-10",
+                           "11-15",
+                           "16-20",
+                           "21-25",
+                           "26-35",
+                           "36-45",
+                           "46-55",
+                           "56-65",
+                            "66-75"
+                          )))
+```
+
+```{r}
+# Accidents
+
+## Accidents associated with Road Condition
+
+bike_accidents %>% 
+   filter(!is.na(road_conditions)) %>% 
+   count("Road Condition" = road_conditions, sort = T, name = "Counts") %>% 
+   mutate(Percent = Counts/sum(Counts)) %>% 
+   gt() %>% 
+   tab_header(title = md("Accidents associated with **Road Condition**"),
+              subtitle = md("Bicycle Accidents in Great Britain **1979 to 2018**")) %>% 
+   fmt_number(columns = Counts, suffixing = T) %>% 
+   tab_style(style = cell_fill(color = "#E9EFF4"),
+             locations = cells_body(columns = c(Counts, 'Road Condition', Percent), 
+                                    rows = Counts > 1e4)) %>% 
+  fmt_percent(columns = Percent, decimals = 2) %>% 
+  tab_style(style = cell_fill(color = "red", alpha = 0.2),
+             locations = cells_body(rows = 'Road Condition' == "Missing Data")) %>% 
+  tab_spanner(label = "Value", columns = 2:3) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**"))
+
+
+bike_accidents %>% 
+   filter(!is.na(road_conditions)) %>% 
+   count(road_conditions, sort = T, name = "Counts") %>% 
+   mutate(Percent = Counts/sum(Counts)) %>% 
+   ggplot(aes(
+     x = fct_reorder(road_conditions, -Percent),
+     y = Percent,
+     fill = road_conditions
+   )) +
+  geom_col(width = 0.5, show.legend = F) +
+  geom_text(aes(label = str_c(round(Percent, 4) * 100, "%")), vjust = -0.5) +
+  scale_y_continuous(labels = label_percent()) +
+  scale_fill_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2")) +
+  theme_classic() +
+  labs(title = "Accidents associated with Road condition",
+       x = "Road Condition",
+       y = "Percent",
+       fill = NULL)
+```
+
+
+```{r}
+## Accidents associated with Road Type
+
+bike_accidents %>% 
+   filter(!is.na(road_type)) %>% 
+   count("Road Type" = road_type, sort = T, name = "Counts") %>% 
+   mutate(Percent = Counts/sum(Counts)) %>% 
+   gt() %>% 
+   tab_header(title = md("Accidents associated with **Road Type**"),
+              subtitle = md("Bicycle Accidents in Great Britain **1979 to 2018**")) %>% 
+   fmt_number(columns = Counts, suffixing = T) %>% 
+   tab_style(style = cell_fill(color = "#E9EFF4"),
+             locations = cells_body(columns = c(Counts, 'Road Type', Percent), 
+                                    rows = Counts > 4e4)) %>% 
+  fmt_percent(columns = Percent, decimals = 2) %>% 
+  tab_style(style = cell_fill(color = "lightblue"),
+             locations = cells_body(rows = 'Road Type' == "Unknown")) %>% 
+  tab_spanner(label = "Value", columns = 2:3) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**"))
+
+
+bike_accidents %>% 
+   filter(!is.na(road_type)) %>% 
+   count(road_type, sort = T, name = "Counts") %>% 
+   mutate(Percent = Counts/sum(Counts)) %>% 
+   ggplot(aes(
+     x = fct_reorder(road_type, Percent),
+     y = Percent,
+     fill = road_type
+   )) +
+  geom_col(width = 0.5, show.legend = F) +
+  geom_text(aes(label = str_c(round(Percent, 4) * 100, "%"),
+            hjust = case_when(Percent > 0.7 ~ 1.5,
+                              TRUE ~ -0.2))) +
+  coord_flip() +
+  scale_y_continuous(labels = label_percent()) +
+  scale_fill_manual(values = c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442",        "#0072B2", "#D55E00", "#CC79A7")) +
+  theme_classic() +
+  labs(title = "Accidents associated with Road Type",
+       x = "Road Type",
+       y = "Percent",
+       fill = NULL)
+```
+
+
+```{r}
+## Accidents associated with Weather Conditions
+
+bike_accidents %>% 
+   filter(!is.na(weather_conditions)) %>% 
+   count("Weather Conditions" = weather_conditions, sort = T, name = "Counts") %>% 
+   mutate(Percent = Counts/sum(Counts)) %>% 
+   gt() %>% 
+   tab_header(title = md("Accidents associated with **Weather Conditions**"),
+              subtitle = md("Bicycle Accidents in Great Britain **1979 to 2018**")) %>% 
+   fmt_number(columns = Counts, suffixing = T) %>% 
+   tab_style(style = cell_fill(color = "#E9EFF4"),
+             locations = cells_body(columns = c(Counts, 'Weather Conditions', Percent), 
+                                    rows = Counts > 3e4)) %>% 
+  fmt_percent(columns = Percent, decimals = 2) %>% 
+  tab_style(style = cell_fill(color = "blue"),
+             locations = cells_body(rows = 'Weather Conditions' == "Unknown")) %>% 
+  tab_spanner(label = "Value", columns = 2:3) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**"))
+
+
+
+bike_accidents %>% 
+   filter(!is.na(weather_conditions)) %>% 
+   count(weather_conditions, sort = T, name = "Counts") %>% 
+   mutate(Percent = Counts/sum(Counts)) %>% 
+   ggplot(aes(
+     x = fct_reorder(weather_conditions, Percent),
+     y = Percent,
+     fill = weather_conditions
+   )) +
+  geom_col(width = 0.5, show.legend = F) +
+  geom_text(aes(label = str_c(round(Percent, 4) * 100, "%"),
+            hjust = case_when(Percent > 0.7 ~ 1.5,
+                              TRUE ~ -0.2))) +
+  coord_flip() +
+  scale_y_continuous(labels = label_percent()) +
+  scale_fill_manual(
+    values = c(
+      '#1b9e77',
+      '#d95f02',
+      '#7570b3',
+      '#e7298a',
+      '#66a61e',
+      '#e6ab02',
+      '#a6cee3',
+      '#1f78b4',
+      '#b2df8a'
+    )
+  ) +
+  theme_classic() +
+  labs(title = "Accidents associated with Weather Conditions",
+       x = "Weather Conditions",
+       y = "Percent",
+       fill = NULL)
+```
+
+
+```{r}
+# Bikers
+
+## Bikers Gender
+
+bikers_female <- bikers %>% 
+  count(gender, sort = T, name = "counts") %>% 
+  mutate(Percent = counts/sum(counts)) %>% 
+  ggplot(aes(gender, counts, fill = gender)) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = c(Male = "gray", Female = "red", Others = "gray")) +
+  theme_minimal() +
+  theme(axis.text = element_blank()) +
+  labs(title = NULL, x = NULL, y = NULL)
+
+bikers_male <- bikers %>% 
+  count(gender, sort = T, name = "counts") %>% 
+  mutate(Percent = counts/sum(counts)) %>% 
+  ggplot(aes(gender, counts, fill = gender)) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = c(Male = "red", Female = "gray", Others = "gray")) +
+  theme_minimal() +
+  theme(axis.text = element_blank()) +
+  labs(title = NULL, x = NULL, y = NULL)
+
+bikers_others <- bikers %>% 
+  count(gender, sort = T, name = "counts") %>% 
+  mutate(Percent = counts/sum(counts)) %>% 
+  ggplot(aes(gender, counts, fill = gender)) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = c(Male = "gray", Female = "gray", Others = "red")) +
+  theme_minimal() +
+  theme(axis.text = element_blank()) +
+  labs(title = NULL, x = NULL, y = NULL)
+
+bikers_gender <- bikers %>% 
+  count("Gender" = gender, sort = T, name = "Counts") %>% 
+  mutate(Percent = Counts/sum(Counts),
+         Plot = list(bikers_female, bikers_male, bikers_others))
+
+
+ gt(bikers_gender) %>% 
+   tab_header(title = md("Bikers **Gender**"),
+              subtitle = md("Bicycle Accidents in Great Britain **1979 to 2018**")) %>% 
+   fmt_number(columns = Counts, suffixing = T) %>% 
+   tab_style(style = cell_fill(color = "#E9EFF4"),
+             locations = cells_body(columns = c(Counts, 'Gender', Percent), 
+                                    rows = Counts > 2e4)) %>% 
+  fmt_percent(columns = Percent, decimals = 2) %>% 
+  tab_style(style = cell_fill(color = "lightblue"),
+             locations = cells_body(rows = 'Gender' == "Others")) %>% 
+  tab_spanner(label = "Value", columns = 2:3) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**")) %>% 
+   text_transform(locations = cells_body(columns = Plot),
+                  fn = function(x) {
+                    map(bikers_gender$Plot, ggplot_image, height = px(75),                              aspect_ratio = 1)
+                  })
+
+
+```
+```{r}
+## Gender Plot
+
+
+male <- bikers %>% 
+  count(gender, sort = T, name = "Counts") %>% 
+  mutate(Percent = Counts/sum(Counts) * 100) %>% 
+  filter(gender == "Male") 
+
+  male_plt<- ggplot(male, aes(gender, Counts, color = gender, size = Counts)) +
+  geom_point(show.legend = F) +
+  facet_wrap(vars(gender), scales = "free") +
+  annotate("text", "Male", male$Counts, label = glue("Male\n", round(male$Percent,1), "%"), size = 8, color = "white") +
+    scale_color_manual(values = c(Male = "steelblue")) +
+    scale_size(range = c(100, 80)) +
+    theme_void() +
+    theme(axis.text = element_blank(),
+          strip.text = element_blank()) +
+    labs(title = NULL,
+         x = NULL,
+         y = NULL)
+  
+  
+  
+female <- bikers %>% 
+  count(gender, sort = T, name = "Counts") %>% 
+  mutate(Percent = Counts/sum(Counts) * 100) %>% 
+  filter(gender == "Female")  
+
+female_plt <- ggplot(female, aes(gender, Counts, color = gender, size = Counts)) +
+  geom_point(show.legend = F) +
+  facet_wrap(vars(gender), scales = "free") +
+  annotate("text", "Female", female$Counts, label = glue("Female\n", round(female$Percent,1), "%"), size = 4, color = "white") +
+    scale_color_manual(values = c(Female = "red")) +
+    scale_size(range = c(80, 20)) +
+    theme_void() +
+    theme(axis.text = element_blank(),
+          strip.text = element_blank()) +
+    labs(title = NULL,
+         x = NULL,
+         y = NULL)
+
+female_plt | male_plt + plot_layout(widths = 0.5)
+  
+```
+```{r}
+## Bikers Age Group
+
+bikers %>% 
+   filter(!is.na(age_grp)) %>% 
+   count("Age Group" = age_grp, sort = T, name = "Counts") %>% 
+   mutate(Percent = Counts/sum(Counts)) %>% 
+   gt() %>% 
+   tab_header(title = md("Bikers **Age Group**"),
+              subtitle = md("Bicycle Accidents in Great Britain **1979 to 2018**")) %>% 
+   fmt_number(columns = Counts, suffixing = T) %>% 
+   tab_style(style = cell_fill(color = "#E9EFF4"),
+             locations = cells_body(columns = c(Counts, 'Age Group', Percent), 
+                                    rows = Counts > 2e4)) %>% 
+  fmt_percent(columns = Percent, decimals = 2) %>% 
+  grand_summary_rows(columns = c(Counts, Percent),
+                     fns = list(
+                       avg = ~mean(., na.rm = TRUE),
+                       total = ~sum(., na.rm = TRUE)),
+                     formatter = c(fmt_number("Counts"), fmt_percent("Percent")),
+                     suffixing = TRUE,
+                     decimals = 2
+                     ) %>% 
+  tab_spanner(label = "Value", columns = 2:3) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**"))
+
+
+bikers %>% 
+  select(age_grp, gender) %>% 
+  filter(gender != "Other") %>% 
+  count(age_grp, gender, sort = T, name = "Counts") %>% 
+  mutate(Percent = Counts/sum(Counts) * 100) %>% 
+  arrange(age_grp) %>% 
+ggplot(aes(age_grp, Percent, fill = gender, label = str_c(round(Percent, 1), "%"))) +
+  geom_col(position = position_dodge()) +
+  geom_text(position = position_dodge(width = 1), vjust = -0.3, size = 3.5) +
+  scale_fill_manual(values = c(Female = "#343D46", Male = "#66A498")) +
+  theme_classic() +
+  theme(legend.position = "top") +
+  labs(title = "The percentage casualties by gender and age group",
+       x = "Age Group",
+       y = "Percent",
+       fill = NULL)
+```
+
+```{r}
+## Bikers Severity
+
+sev_slight <- bikers %>% 
+  count(severity, sort = T, name = "Counts") %>% 
+  mutate(Percent = Counts/sum(Counts)) %>% 
+  ggplot(aes(severity, Counts, fill = severity)) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = c(Slight = "red", Serious = "gray", Fatal = "gray")) +
+  theme_minimal() +
+  theme(axis.text = element_blank()) +
+  labs(title = NULL, x = NULL, y = NULL)
+
+sev_serious <- bikers %>% 
+  count(severity, sort = T, name = "Counts") %>% 
+  mutate(Percent = Counts/sum(Counts)) %>% 
+  ggplot(aes(severity, Counts, fill = severity)) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = c(Slight = "gray", Serious = "red", Fatal = "gray")) +
+  theme_minimal() +
+  theme(axis.text = element_blank()) +
+  labs(title = NULL, x = NULL, y = NULL)
+
+sev_fatal <- bikers %>% 
+  count(severity, sort = T, name = "Counts") %>% 
+  mutate(Percent = Counts/sum(Counts)) %>% 
+  ggplot(aes(severity, Counts, fill = severity)) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = c(Slight = "gray", Serious = "gray", Fatal = "red")) +
+  theme_minimal() +
+  theme(axis.text = element_blank()) +
+  labs(title = NULL, x = NULL, y = NULL)
+
+
+ severity_table <- bikers %>% 
+  count("Severity" = severity, sort = T, name = "Counts") %>% 
+  mutate(Percent = Counts/sum(Counts),
+         Plot = list(sev_slight, sev_serious, sev_fatal))
+
+
+ gt(severity_table) %>% 
+   tab_header(title = md("Bikers **Severity**"),
+              subtitle = md("Bicycle Accidents in Great Britain **1979 to 2018**")) %>% 
+   fmt_number(columns = Counts, suffixing = T) %>% 
+   tab_style(style = cell_fill(color = "#E9EFF4"),
+             locations = cells_body(columns = c(Counts, 'Severity', Percent), 
+                                    rows = Counts > 2e4)) %>% 
+  fmt_percent(columns = Percent, decimals = 2) %>% 
+  tab_style(style = cell_fill(color = "lightpink"),
+             locations = cells_body(rows = 'Severity' == "Fatal")) %>% 
+  tab_spanner(label = "Value", columns = 2:3) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**")) %>% 
+   text_transform(locations = cells_body(columns = Plot),
+                  fn = function(x) {
+                    map(severity_table$Plot, ggplot_image, height = px(75),                              aspect_ratio = 1)
+                  })
+
+
+```
+```{r}
+# Combine two Datasets (bike_accidents and bikers)
+
+full_df <- bike_accidents %>% 
+  left_join(bikers, by = "accident_index")
+
+
+```
+
+```{r}
+# Accidents Date and Time
+
+## Average accidents by year
+
+avg_accidents_by_year <- full_df %>% 
+  mutate(date = ymd(date),
+         year = year(date)) %>% 
+  group_by(date, year) %>% 
+  summarise(count = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  group_by(year) %>% 
+  summarise(avg = mean(count), .groups = "drop") %>% 
+  ungroup() %>% 
+  arrange(desc(avg))
+
+```
+
+```{r}
+## Accidents by year and month
+
+acc_year_month <- full_df %>% 
+  select(date) %>% 
+  mutate(date = ymd(date),
+         month = month(date, label = TRUE),
+         year = year(date)) %>% 
+  group_by(year, month) %>% 
+  summarise(count = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  arrange(year, month)
+
+## Plot Accidents by year and month
+
+ggplot(acc_year_month) +
+  geom_line(aes(month, count, col = as.factor(year), group = year), size = 1.2) +
+  gghighlight(max(counts),
+              unhighlighted_params = list(size = 1, colour = alpha("gray", 0.4)),
+              label_key = year,
+              label_params = list(size = 4)) +
+  annotate(geom = "rect", xmin = "Jan", xmax = "Mar", ymin = 0, ymax = 275, fill = "#1D3454", color = "gray", size = 1, alpha = 0.5) +
+    annotate(geom = "text", x = "Feb", y = 115, label = "Winter", color = "black", size = 4)+
+    annotate(geom = "rect", xmin = "Mar", xmax = "Jun", ymin = 0, ymax = 275, fill = "#23644E", color = "gray", size = 1, alpha = 0.5) +
+    annotate(geom = "text", x = "Apr", y = 115, label = "Spring", color = "white", size = 4)+
+    annotate(geom = "rect", xmin = "Jun", xmax = "Sep", ymin = 0, ymax = 275, fill = "#344DB4", color = "gray", size = 1, alpha = 0.5) +
+    annotate(geom = "text", x = "Jul", y = 115, label = "Summer", color = "black", size = 4)+
+    annotate(geom = "rect", xmin = "Sep", xmax = "Dec", ymin = 0, ymax = 275, fill = "#EEB244", color = "gray", size = 1, alpha = 0.5) +
+    annotate(geom = "text", x = "Oct", y = 115, label = "Fall", color = "#974F01", size = 4)+
+    annotate(geom = "rect", xmin = "Dec", xmax = Inf, ymin = 0, ymax = 275, fill = "#1D3454", color = "gray", size = 1, alpha = 0.5) +
+  scale_color_manual(values = c("#13AD00",
+                                "#194D43",
+                                "#6B244B",
+                                "#DE1F1A",
+                                "#FF4403")) +
+  theme_classic() +
+  labs(title = "Number of Accidents by season",
+       x = "Month",
+       y = "Counts",
+       fill = NULL)
+
+
+
+```
+
+```{r, fig.height=5, fig.width=9, fig.align='center'}
+
+ accidents_by_time <- full_df %>% 
+  select(time) %>% 
+  mutate(time = parse_date_time(time, orders = c("%H:%M:%S")),
+         time = floor_date(time, unit = "hour")) %>% 
+  group_by(time) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  arrange(time)
+
+```
+```{r}
+accidents_by_weekday <- full_df %>% 
+  select(date) %>% 
+  mutate(weekday = wday(date, label = TRUE)) %>% 
+  group_by(weekday) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  mutate(percent = counts/sum(counts) * 100, label = str_c(round(percent, 0), "%")) %>% 
+  ungroup() %>% 
+  arrange(weekday)
+  
+```
+```{r}
+plot_object_1 <- ggplot(accidents_by_time) +
+  geom_line(aes(time, counts), size = 1.2, color = "steelblue") +
+  geom_point(aes(time, counts), size = 2, color = "darkred") +
+  scale_x_time(labels = label_time(format = "%H:%M")) +
+  scale_y_continuous(labels = unit_format(unit = "k", scale = 1e-3)) +
+  labs(title = "Accidents by Time",
+       x =NULL,
+       y =NULL)
+
+
+plot_object_2 <- ggplot(avg_accidents_by_year) +
+  geom_line(aes(year, avg), size = 1.2, color = "darkgreen") +
+  geom_point(aes(year, avg), size = 2, color = "darkred") +
+  labs(title = "Average Accidents by Year",
+       x =NULL,
+       y =NULL)
+
+plot_object_3 <- ggplot(accidents_by_weekday) +
+  geom_col(aes(weekday, counts), fill = "#204338", width = 0.8) +
+  geom_text(aes(weekday, counts, label = label), vjust = 1.8, fontface = "bold", color = "white") +
+  scale_y_continuous(labels = unit_format(unit = "k", scale = 1e-3)) +
+  labs(title = "Accidents by Weekday",
+       x =NULL,
+       y =NULL)
+
+```
+```{r}
+## Accidents by time, year and weekday
+
+acci_time_year_weekday <- tibble(
+      Observation = c("**Average accidents by year**: <br /> - The plot shows that between 1995 and 2005/6/7 the number of accidents noticeably decreased, <br /> - Then from 2010 the number of accidents rose again up to 2014, <br /> then start to fall again.",
+ "**Accidents by day time**: <br /> - The majority of pedal cyclist Accidents occur during the week between Monday and Friday. <br /> The peak time for pedal cyclist Accidents is from 7am to 9am and from 3pm to 7pm.<br /> - It is clear that the working time and the number of accidents at least during the week-days are highly correlated ",
+"**Accidents by Weekday**: <br /> - Saturdays and Sundays have the lowest number of Accidents. <br /> Next plot we will see more explanations about that."),
+ plot = list(plot_object_1, plot_object_2, plot_object_3)
+)
+
+gt(acci_time_year_weekday) %>% 
+  tab_header(title = md("Bicycle Accidents")) %>% 
+  text_transform(locations = cells_body(columns = plot),
+                 fn = function(x) {
+                   map(acci_time_year_weekday$plot, ggplot_image, height = px(400),
+                       aspect_ratio = 1)
+                 }) %>% 
+  fmt_markdown(columns = Observation, rows = TRUE) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                    **Data**: Bicycle Accidents in Great Britain **1979 to 2018**")) %>% 
+  tab_options(heading.align = "center",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4))
+  
+  
+```
+```{r}
+## Reported pedal cyclist KSIs by time of day and day of week and Weekend
+
+fss_by_weekdays <- full_df %>% 
+  select(time, day) %>% 
+  mutate(time = parse_date_time(time, orders = "%H:%M:%S"),
+         time = floor_date(time, unit = "hour")) %>% 
+  filter(!day %in% c("Saturday", "Sunday")) %>% 
+  group_by(time) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  mutate(percent_time = counts/sum(counts) * 100) %>% 
+  ungroup() %>% 
+  arrange(time)
+
+fss_sunday <- full_df %>% filter(day == "Sunday") %>% 
+  select(time) %>% 
+  mutate(time = parse_date_time(time, orders = "%H:%M:%S"),
+         time = floor_date(time, unit = "hour")) %>% 
+  group_by(time) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  mutate(percent_sunday = counts/sum(counts) * 100) %>% 
+  ungroup() %>% 
+  arrange(time)
+  
+color_code <- c("Weekdays" = "#B7262D", "Sunday" = "#FDAF01", "Saturday" = "#0E1856")
+
+fss_saturday <- full_df %>% filter(day == "Saturday") %>% 
+  select(time) %>% 
+  mutate(time = parse_date_time(time, orders = "%H:%M:%S"),
+         time = floor_date(time, unit = "hour")) %>% 
+  group_by(time) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  mutate(percent_saturday = counts/sum(counts) * 100) %>% 
+  ungroup() %>% 
+  arrange(time)
+
+ggplot() +
+  geom_line(data = fss_by_weekdays, aes(time, percent_time, color = "weekdays"), size = 2) +
+  geom_line(data = fss_sunday, aes(time, percent_sunday, color = "sunday"), size = 2, linetype = 2) +
+  geom_line(data = fss_saturday, aes(time, percent_saturday, color = "saturday"), size = 2, linetype = 2)+
+  scale_x_time(labels = label_time(format = "%H:%M")) +
+  scale_y_continuous(labels = unit_format(scale = 1)) +
+  theme_classic() +
+  theme(legend.position = "top") +
+  labs(title = "Average Accidents Time",
+       x = "Time of Day",
+       y = "Total FSS"
+       ) 
+   
+
+
+```
+```{r}
+# Severity 2000-2018
+
+full_df %>% 
+  select(severity, date) %>% 
+  group_by(severity, Year = year(date)) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  arrange(Year) %>% 
+  pivot_wider(names_from = severity, values_from = counts) %>% 
+  mutate(Total = rowSums(.)) %>% 
+  filter(Year >= 2000) %>% 
+  gt() %>% 
+  tab_header(title = md("Number of reported pedal cycle casualties by severity")) %>% 
+  tab_style(style = list(cell_text(weight = "bold")),
+            locations = cells_column_labels(columns = c(1:5))) %>% 
+  tab_style(style = list(cell_text(weight = "bold")),
+            locations = cells_body(columns = c("Year", "Total"))) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**"))
+
+  
+```
+```{r}
+## Severity by weather condition
+
+severity_weather_condition <- full_df %>% 
+  select(severity, weather_conditions) %>% 
+  filter(!is.na(weather_conditions)) %>% 
+  group_by(severity, weather_conditions) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  mutate(percent = round(counts/sum(counts) * 100, 1)) %>% 
+  filter(percent > 0) %>%  
+  arrange(desc(counts))
+
+gt(severity_weather_condition, groupname_col = "severity") %>% 
+  tab_header(title = md("severity by weather condition")) %>% 
+  tab_style(list(cell_fill(color = "lightpink")),
+            locations = cells_body(rows = severity == "Fatal" )) %>%       fmt_percent(columns = percent, decimals = 2, scale_values = F) %>% 
+  tab_spanner(label = "Value", columns = 3:4) %>% 
+  cols_align(align = "right",
+             columns = -1) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**"))
+  
+  
+  
+```
+```{r}
+## Severity by light conditions
+
+severity_light_condition <- full_df %>% 
+  select(severity, light_conditions) %>% 
+  group_by(severity, light_conditions) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  mutate(percent = round(counts/sum(counts) * 100, 1)) %>% 
+  filter(percent > 0) %>%  
+  arrange(desc(counts))
+
+gt(severity_light_condition, groupname_col = "severity") %>% 
+  tab_header(title = md("Severity by light condition")) %>% 
+  tab_style(list(cell_fill(color = "lightpink")),
+            locations = cells_body(rows = severity == "Fatal" )) %>%       fmt_percent(columns = percent, decimals = 2, scale_values = FALSE) %>% 
+  tab_spanner(label = "Value", columns = 3:4) %>% 
+  cols_align(align = "right",
+             columns = -1) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**"))
+  
+  
+```
+
+```{r}
+## Severity by speed limit
+
+severity_by_speedlimit <- full_df %>% 
+  select(severity, speed_limit) %>% 
+  group_by(severity, speed_limit) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  mutate(percent = round(counts/sum(counts) * 100, 1)) %>% 
+  filter(percent > 0) %>%  
+  arrange(desc(counts))
+
+gt(severity_by_speedlimit, groupname_col = "severity") %>% 
+  tab_header(title = md("Severity by speed limit")) %>% 
+  tab_style(list(cell_fill(color = "lightpink")),
+            locations = cells_body(rows = severity == "Fatal" )) %>%       fmt_percent(columns = percent, decimals = 1, scale_values = FALSE) %>% 
+  tab_spanner(label = "Value", columns = 3:4) %>% 
+  cols_align(align = "right",
+             columns = -1) %>% 
+  tab_options(heading.subtitle.font.size = 12,
+              heading.align = "left",
+              table.border.top.color = "black",
+              column_labels.border.bottom.color = "black",
+              column_labels.border.bottom.width = px(4)) %>% 
+  tab_source_note(md("**Source**: Kaggle.com | 
+                     **Data**: Bicycle Accidents in Great Britain **1979 to 2018**"))
+```
+
+```{r}
+## Index of bicycle accidents and reported casualties by severity 1979-2018
+
+
+index_fatal <- full_df %>% 
+  select(date, severity) %>% 
+  filter(severity == "Fatal") %>% 
+  group_by(severity, year = year(date)) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  arrange(year) %>% 
+  mutate(index = (counts/nth(counts, 1)) * 100)
+  
+index_slight <- full_df %>% 
+  select(date, severity) %>% 
+  filter(severity == "Slight") %>% 
+  group_by(severity, year = year(date)) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  arrange(year) %>% 
+  mutate(index = (counts/nth(counts, 1)) * 100)
+  
+  
+index_serious <- full_df %>% 
+  select(date, severity) %>% 
+  filter(severity == "Serious") %>% 
+  group_by(severity, year = year(date)) %>% 
+  summarise(counts = n(), .groups = "drop") %>% 
+  ungroup() %>% 
+  arrange(year) %>% 
+  mutate(index = (counts/nth(counts, 1)) * 100)
+  
+ data_prep <- bind_rows(index_fatal, index_serious, index_slight) %>% 
+    mutate(index = round(index, 0)) %>% 
+    group_by(severity, year, index) %>% 
+    summarise(counts = n(), .groups = "drop") %>% 
+    ungroup() %>% 
+    arrange(year)
+  
+ 
+ ggplot(data_prep) +
+   geom_line(aes(year, index, color = severity), size = 1.5) +
+   geom_hline(yintercept = 100,
+              linetype = "dashed",
+              size = 1.2,
+              color = "#FF6501") +
+   scale_color_manual(values = c("#CF2257", "#0E1856", "#13AD00"))+
+   theme_classic() +
+   labs(title = "Index of bicycle accidents and reported casualties by severity",
+        x = "Year",
+        y = "Index(1979 = 100)",
+        color = NULL)
